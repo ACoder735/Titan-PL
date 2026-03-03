@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "utils.h" // Added for error reporting
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -187,13 +188,17 @@ Token getNextToken(Lexer* lexer) {
         case ',': t.type = TOKEN_COMMA; strcpy(t.value, ","); break;
         case '.': t.type = TOKEN_DOT; strcpy(t.value, "."); break;
         case ';': t.type = TOKEN_SEMICOLON; strcpy(t.value, ";"); break;
-        case '*': t.type = TOKEN_STAR; strcpy(t.value, "*"); break; // FIX: Added strcpy
-        case '%': t.type = TOKEN_PERCENT; strcpy(t.value, "%"); break; // FIX: Added strcpy
+        case '*': t.type = TOKEN_STAR; strcpy(t.value, "*"); break;
+        case '%': t.type = TOKEN_PERCENT; strcpy(t.value, "%"); break;
         case '[': t.type = TOKEN_LBRACKET; strcpy(t.value, "["); break; 
         case ']': t.type = TOKEN_RBRACKET; strcpy(t.value, "]"); break;
         default:
-            printf("LEXER ERROR: Unknown character '%c' on line %d\n", c, lexer->line);
-            exit(1);
+            // FIXED: Safe Error Handling
+            {
+                char errBuf[100];
+                sprintf(errBuf, "Unknown character '%c'", c);
+                print_error(errBuf, lexer->line);
+            }
     }
     return t;
 }

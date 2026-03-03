@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "utils.h" // Added for error reporting
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,15 +24,30 @@ Token peekNextToken(Parser* parser) {
 
 void expect(Parser* parser, TokenType type) {
     if (parser->currentToken.type != type) {
-        printf("PARSE ERROR: Expected token %d but got %d (%s) on line %d\n", 
-               type, parser->currentToken.type, parser->currentToken.value, parser->lexer->line);
-        exit(1);
+        char errBuf[256];
+        if (type == TOKEN_IDENTIFIER) {
+            sprintf(errBuf, "Expected a name, but got '%s'", parser->currentToken.value);
+        } else if (type == TOKEN_NUMBER) {
+            sprintf(errBuf, "Expected a number, but got '%s'", parser->currentToken.value);
+        } else if (type == TOKEN_STRING) {
+            sprintf(errBuf, "Expected a string, but got '%s'", parser->currentToken.value);
+        } else if (type == TOKEN_RPAREN) {
+            sprintf(errBuf, "Missing closing ')' near '%s'", parser->currentToken.value);
+        } else if (type == TOKEN_RBRACE) {
+            sprintf(errBuf, "Missing closing '}' near '%s'", parser->currentToken.value);
+        } else {
+            sprintf(errBuf, "Syntax error near '%s'", parser->currentToken.value);
+        }
+        print_error(errBuf, parser->lexer->line);
     }
     nextToken(parser);
 }
 
 ASTNode* createNode(ASTNodeType type) {
     ASTNode* node = malloc(sizeof(ASTNode));
+    if (!node) {
+        print_error("System out of memory", 0);
+    }
     node->type = type;
     node->left = NULL; node->right = NULL;
     node->next = NULL; node->body = NULL; node->step = NULL;
@@ -80,8 +96,7 @@ ASTNode* parseStatement(Parser* parser) {
         nextToken(parser); // Eat type
         
         if (parser->currentToken.type != TOKEN_IDENTIFIER) {
-            printf("Error: Expected variable name after type on line %d\n", parser->lexer->line);
-            exit(1);
+            print_error("Expected variable name after type", parser->lexer->line);
         }
         
         ASTNode* node = createNode(AST_VARDECL);
@@ -89,8 +104,7 @@ ASTNode* parseStatement(Parser* parser) {
         nextToken(parser); // Eat identifier
         
         if (parser->currentToken.type != TOKEN_ASSIGN && parser->currentToken.type != TOKEN_VARDECL) {
-            printf("Error: Expected '=' after variable name on line %d\n", parser->lexer->line);
-            exit(1);
+            print_error("Expected '=' after variable name", parser->lexer->line);
         }
         nextToken(parser); // Eat '='
         
@@ -172,6 +186,8 @@ ASTNode* parseStatement(Parser* parser) {
              strcpy(node->name, parser->currentToken.value);
              nextToken(parser); 
              expect(parser, TOKEN_VARDECL);
+        } else {
+            print_error("Expected loop variable in for-loop", parser->lexer->line);
         }
         node->left = parseExpression(parser); 
         expect(parser, TOKEN_TO);
@@ -183,13 +199,18 @@ ASTNode* parseStatement(Parser* parser) {
     if (t.type == TOKEN_FUNC) {
         nextToken(parser);
         ASTNode* node = createNode(AST_FUNCDECL);
-        if (parser->currentToken.type != TOKEN_IDENTIFIER) { printf("Error: Expected func name\n"); exit(1); }
+        if (parser->currentToken.type != TOKEN_IDENTIFIER) {
+            print_error("Expected function name", parser->lexer->line);
+        }
         strcpy(node->name, parser->currentToken.value);
         nextToken(parser);
         expect(parser, TOKEN_LPAREN);
         
         ASTNode* lastArg = NULL;
         while (parser->currentToken.type != TOKEN_RPAREN) {
+            if (parser->currentToken.type != TOKEN_IDENTIFIER) {
+                print_error("Expected argument name", parser->lexer->line);
+            }
             ASTNode* arg = createNode(AST_IDENTIFIER);
             strcpy(arg->name, parser->currentToken.value);
             nextToken(parser);
@@ -336,8 +357,7 @@ ASTNode* parseFactor(Parser* parser) {
                  expect(parser, TOKEN_RPAREN);
                  return node;
             }
-            printf("Error: Unexpected keyword '%s'\n", t.value);
-            exit(1);
+            print_error("Unexpected keyword", parser->lexer->line);
         }
         
         // Standard Identifier or Method Call
@@ -351,8 +371,7 @@ ASTNode* parseFactor(Parser* parser) {
             nextToken(parser);
             
             if (parser->currentToken.type != TOKEN_IDENTIFIER) {
-                printf("Error: Expected identifier after '.' on line %d\n", parser->lexer->line);
-                exit(1);
+                print_error("Expected name after '.'", parser->lexer->line);
             }
             strcat(node->name, parser->currentToken.value);
             nextToken(parser);
@@ -381,8 +400,11 @@ ASTNode* parseFactor(Parser* parser) {
         return node;
     }
     
-    printf("Error: Unexpected token '%s' in expression on line %d\n", t.value, parser->lexer->line);
-    exit(1);
+    // If we got here, nothing matched
+    char errBuf[100];
+    sprintf(errBuf, "Unexpected token '%s'", t.value);
+    print_error(errBuf, parser->lexer->line);
+    return NULL; // Unreachable, but keeps compiler happy
 }
 
 ASTNode* parseBlock(Parser* parser) {

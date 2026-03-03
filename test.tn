@@ -14,7 +14,7 @@ Array levels = [1, 2, 3]
 // 3. Math Operations
 a := 10
 b := 5
-sum := a + b
+sum := a + b 
 diff := a - b
 prod := a * b
 div := a / b
@@ -24,7 +24,7 @@ console.typeln(Str(sum))
 console.typeln(Str(diff))
 
 // 4. Logic & Loops
-if score == 100 { // Ln. 27
+if score == 100 { 
     console.typeln("Perfect Score!")
 }
 
@@ -40,8 +40,8 @@ levels.push(5)
 levels.remove(0)
 
 // Get length
-len := len(levels)
-console.typeln(Str(len))
+leng := len(levels)
+console.typeln(Str(leng))
 
 // Print Array (must convert to string)
 console.typeln(Str(levels))
@@ -56,7 +56,7 @@ console.typeln("Function Result:")
 console.typeln(Str(result))
 
 // 7. Console Customization
-console.typeln("--- Console Features ---")
+console.typeln("--- Console Features ---"
 
 // Set Title
 console.setTitle("Titan Runtime Test")
@@ -76,6 +76,9 @@ console.typeln("This text is yellow!")
 // Reset Color (7 = Default White)
 console.color(7)
 console.typeln("Back to normal.")
+
+name := console.askuser("What is your name? ")
+console.typeln("Hello, " + name + "! Welcome to Titan.")
 
 // Clear Screen (Uncomment to test)
 //console.clear()

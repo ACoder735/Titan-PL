@@ -1,4 +1,5 @@
 #include "codegen.h"
+#include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +51,6 @@ void generateNode(ASTNode* node, FILE* out) {
         case AST_IDENTIFIER: fprintf(out, "%s", node->name); break;
         
         case AST_ARRAY: {
-            // Use GCC extension ({ ... }) to build array cleanly in one expression
             fprintf(out, "({ TitanVar _t = titan_new_array(); ");
             ASTNode* elem = node->left;
             while(elem) {
@@ -66,7 +66,7 @@ void generateNode(ASTNode* node, FILE* out) {
         case AST_VARDECL: {
             if (hasSymbol(node->name)) {
                 fprintf(out, "%s = ", node->name);
-                generateNode(node->right, out); // May be NULL, causing possible errors.
+                generateNode(node->right, out);
                 fprintf(out, ";\n");
             } else {
                 addSymbol(node->name);
@@ -79,7 +79,9 @@ void generateNode(ASTNode* node, FILE* out) {
             
         case AST_ASSIGN:
             if (!hasSymbol(node->name)) {
-                printf("Warning: Variable '%s' might not be declared.\n", node->name);
+                char buf[150];
+                sprintf(buf, "Variable '%s' not declared. Use := to create it.", node->name);
+                print_error(buf, 0); // This uses the compiler's utils
             }
             fprintf(out, "%s = ", node->name);
             generateNode(node->right, out);
@@ -272,6 +274,18 @@ void writeRuntimeHeader(const char* filename) {
     // Boolean
     fprintf(out, "int titan_bool(TitanVar v) { if (v.type == 0) return 0; if (v.type == 1) return v.num != 0; if (v.type == 2) return v.str != NULL && strlen(v.str) > 0; return 0; }\n\n");
     
+    // --- ERROR HELPER (Injected into runtime) ---
+    fprintf(out, "void _titan_runtime_error(const char* msg) {\n");
+    fprintf(out, "    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);\n");
+    fprintf(out, "    CONSOLE_SCREEN_BUFFER_INFO info;\n");
+    fprintf(out, "    GetConsoleScreenBufferInfo(h, &info);\n");
+    fprintf(out, "    WORD old = info.wAttributes;\n");
+    fprintf(out, "    SetConsoleTextAttribute(h, FOREGROUND_RED | FOREGROUND_INTENSITY);\n");
+    fprintf(out, "    printf(\"[Runtime Error]: %%s\\n\", msg);\n");
+    fprintf(out, "    SetConsoleTextAttribute(h, old);\n");
+    fprintf(out, "    exit(1);\n");
+    fprintf(out, "}\n\n");
+
     // Array Functions
     fprintf(out, "TitanVar titan_new_array() {\n");
     fprintf(out, "    TitanArray* a = malloc(sizeof(TitanArray));\n");
@@ -357,30 +371,30 @@ void writeRuntimeHeader(const char* filename) {
 
     fprintf(out, "TitanVar titan_tonum(TitanVar v) { if (v.type == 1) return v; if (v.type == 2) return titan_num(atof(v.str)); return titan_num(0); }\n\n");
     
-    // Print
+    // Print - UPDATED to use runtime error
     fprintf(out, "void titan_print(TitanVar v) {\n");
     fprintf(out, "    if (v.type == 2) printf(\"%%s\", v.str);\n"); 
-    fprintf(out, "    else { printf(\"RUNTIME ERROR: Cannot print non-String types. Use Str(val).\\n\"); exit(1); }\n");
+    fprintf(out, "    else _titan_runtime_error(\"Cannot print non-String types. Use Str(val).\");\n");
     fprintf(out, "}\n");
     fprintf(out, "void titan_println(TitanVar v) { titan_print(v); printf(\"\\n\"); }\n\n");
     
     // Input
     fprintf(out, "TitanVar titan_input(TitanVar prompt) { titan_print(prompt); fflush(stdout); char* buffer = malloc(256); if (fgets(buffer, 256, stdin) != NULL) { buffer[strcspn(buffer, \"\\n\")] = 0; buffer[strcspn(buffer, \"\\r\")] = 0; return titan_str(buffer); } return TITAN_NULL; }\n\n");
     
-    // Math
+    // Math - UPDATED to use runtime error
     fprintf(out, "TitanVar titan_add(TitanVar a, TitanVar b) {\n");
     fprintf(out, "    if (a.type == 1 && b.type == 1) return titan_num(a.num + b.num);\n"); 
     fprintf(out, "    if (a.type == 2 && b.type == 2) { int len = strlen(a.str) + strlen(b.str) + 1; char* res = malloc(len); strcpy(res, a.str); strcat(res, b.str); return titan_str(res); }\n"); 
     fprintf(out, "    if (a.type == 3 && b.type == 3) return titan_arr_concat(a, b);\n");
-    fprintf(out, "    printf(\"RUNTIME ERROR: Cannot add mismatched types.\\n\"); exit(1);\n"); 
+    fprintf(out, "    _titan_runtime_error(\"Cannot add mismatched types.\");\n"); 
     fprintf(out, "}\n\n");
     
-    fprintf(out, "TitanVar titan_sub(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) { printf(\"RUNTIME ERROR: '-' requires Numbers.\\n\"); exit(1); } return titan_num(a.num - b.num); }\n");
-    fprintf(out, "TitanVar titan_mul(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) { printf(\"RUNTIME ERROR: '*' requires Numbers.\\n\"); exit(1); } return titan_num(a.num * b.num); }\n");
-    fprintf(out, "TitanVar titan_div(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) { printf(\"RUNTIME ERROR: '/' requires Numbers.\\n\"); exit(1); } return titan_num(a.num / b.num); }\n");
-    fprintf(out, "TitanVar titan_mod(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) { printf(\"RUNTIME ERROR: '%%%%' requires Numbers.\\n\"); exit(1); } return titan_num(fmod(a.num, b.num)); }\n\n");
+    fprintf(out, "TitanVar titan_sub(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) _titan_runtime_error(\"'-' requires Numbers.\"); return titan_num(a.num - b.num); }\n");
+    fprintf(out, "TitanVar titan_mul(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) _titan_runtime_error(\"'*' requires Numbers.\"); return titan_num(a.num * b.num); }\n");
+    fprintf(out, "TitanVar titan_div(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) _titan_runtime_error(\"'/' requires Numbers.\"); return titan_num(a.num / b.num); }\n");
+    fprintf(out, "TitanVar titan_mod(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) _titan_runtime_error(\"'%%' requires Numbers.\"); return titan_num(fmod(a.num, b.num)); }\n\n");
 
-    fprintf(out, "TitanVar titan_neg(TitanVar a) { if(a.type != 1) { printf(\"RUNTIME ERROR: '-' requires Number.\\n\"); exit(1); } return titan_num(-a.num); }\n");
+    fprintf(out, "TitanVar titan_neg(TitanVar a) { if(a.type != 1) _titan_runtime_error(\"'-' requires Number.\"); return titan_num(-a.num); }\n");
     fprintf(out, "TitanVar titan_not(TitanVar a) { return titan_num(!titan_bool(a)); }\n");
     fprintf(out, "TitanVar titan_and(TitanVar a, TitanVar b) { return titan_num(titan_bool(a) && titan_bool(b)); }\n");
     fprintf(out, "TitanVar titan_or(TitanVar a, TitanVar b) { return titan_num(titan_bool(a) || titan_bool(b)); }\n\n");
