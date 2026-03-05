@@ -84,6 +84,9 @@ Token getNextToken(Lexer* lexer) {
         else if (strcmp(t.value, "true") == 0) t.type = TOKEN_TRUE;
         else if (strcmp(t.value, "false") == 0) t.type = TOKEN_FALSE;
         else if (strcmp(t.value, "null") == 0) t.type = TOKEN_NULL;
+        else if (strcmp(t.value, "break") == 0) t.type = TOKEN_BREAK; 
+        else if (strcmp(t.value, "continue") == 0) t.type = TOKEN_CONTINUE; 
+        else if (strcmp(t.value, "use") == 0) t.type = TOKEN_USE;
         
         // Type Keywords
         else if (strcmp(t.value, "Num") == 0) t.type = TOKEN_NUM_TYPE;

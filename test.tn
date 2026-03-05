@@ -4,7 +4,7 @@
 
 // 1. Variable Declarations
 title := "Titan Stress Test"
-version := 0.9
+version := 0.9 // Semi-colons are optional.
 
 // 2. Explicit Types
 Num score = 100
@@ -18,19 +18,37 @@ sum := a + b
 diff := a - b
 prod := a * b
 div := a / b
+rem := a % b
 
 console.typeln("Math Test:")
 console.typeln(Str(sum))
 console.typeln(Str(diff))
+console.typeln(Str(rem))
 
 // 4. Logic & Loops
 if score == 100 { 
     console.typeln("Perfect Score!")
+} else if score >= 90 {
+    console.typeln("Great Job!")
+} else {
+    console.typeln("Keep Trying!")
 }
 
 console.typeln("Loop Test:")
 for i := 0 to 3 {
+    if i == 1 {
+        continue // Test continue statement
+    }
     console.typeln(Str(i))
+}
+
+console.typeln("While Loop Test:")
+while a > 0 {
+    if a == 5 {
+        break // Test break statement
+    }
+    console.typeln(Str(a))
+    a := a - 1
 }
 
 // 5. Array Manipulation
@@ -45,6 +63,8 @@ console.typeln(Str(leng))
 
 // Print Array (must convert to string)
 console.typeln(Str(levels))
+console.typeln("Accessing First Element:")
+console.typeln(Str(levels[0])) 
 
 // 6. Functions
 func addNums(x, y) {
@@ -56,7 +76,7 @@ console.typeln("Function Result:")
 console.typeln(Str(result))
 
 // 7. Console Customization
-console.typeln("--- Console Features ---"
+console.typeln("--- Console Features ---")
 
 // Set Title
 console.setTitle("Titan Runtime Test")
@@ -84,4 +104,71 @@ console.typeln("Hello, " + name + "! Welcome to Titan.")
 //console.clear()
 //console.typeln("Screen was just cleared!")
 
+// ==========================================
+// TITAN v0.9.0 MODULE TEST
+// ==========================================
+
+console.typeln("=== TITAN MODULE TEST ===")
+console.typeln("")
+
+// ===== MATH MODULE =====
+use math
+
+console.typeln("--- MATH ---")
+console.typeln("Pi: " + Str(math_pi()))
+console.typeln("E: " + Str(math_e()))
+console.typeln("Sqrt(16): " + Str(math_sqrt(16)))
+console.typeln("Pow(2, 8): " + Str(math_pow(2, 8)))
+console.typeln("Abs(-42): " + Str(math_abs(-42)))
+console.typeln("Floor(3.7): " + Str(math_floor(3.7)))
+console.typeln("Ceil(3.2): " + Str(math_ceil(3.2)))
+console.typeln("Round(3.5): " + Str(math_round(3.5)))
+console.typeln("Min(5, 10): " + Str(math_min(5, 10)))
+console.typeln("Max(5, 10): " + Str(math_max(5, 10)))
+console.typeln("Sin(0): " + Str(math_sin(0)))
+console.typeln("Cos(0): " + Str(math_cos(0)))
+console.typeln("Log(10): " + Str(math_log(10)))
+console.typeln("Degrees(3.14159): " + Str(math_degrees(math_pi())))
+console.typeln("")
+
+// ===== TIME MODULE =====
+use time
+
+console.typeln("--- TIME ---")
+console.typeln("Year: " + Str(time_year()))
+console.typeln("Month: " + Str(time_month()))
+console.typeln("Day: " + Str(time_day()))
+console.typeln("Hour: " + Str(time_hour()))
+console.typeln("Minute: " + Str(time_minute()))
+console.typeln("Second: " + Str(time_second()))
+console.typeln("Weekday: " + Str(time_weekday()))
+console.typeln("Timestamp: " + Str(time_now()))
+console.typeln("")
+
+// ===== SYS MODULE =====
+use sys
+
+console.typeln("--- SYS ---")
+console.typeln("OS: " + Str(sys_os()))
+console.typeln("Arch: " + Str(sys_arch()))
+console.typeln("CWD: " + Str(sys_cwd()))
+console.typeln("Args count: " + Str(len(sys_args())))
+console.typeln("")
+
+// ===== FILE MODULE =====
+use file
+
+console.typeln("--- FILE ---")
+file.write("testfile.txt", "Hello from Titan!")
+console.typeln("File exists: " + Str(file_exists("testfile.txt")))
+console.typeln("File size: " + Str(file_size("testfile.txt")) + " bytes")
+console.typeln("Content: " + Str(file_read("testfile.txt")))
+file_append("testfile.txt", " Appended text!")
+console.typeln("After append: " + Str(file_read("testfile.txt")))
+file_delete("testfile.txt")
+console.typeln("After delete: " + Str(file_exists("testfile.txt")))
+console.typeln("")
+
 console.typeln("Test Complete.")
+
+// ←--- End of Titan Stress Test ---

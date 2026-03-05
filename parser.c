@@ -1,5 +1,5 @@
 #include "parser.h"
-#include "utils.h" // Added for error reporting
+#include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,7 +93,7 @@ ASTNode* parseStatement(Parser* parser) {
     
     // 1. Explicit Definition: Num x = 5
     if (t.type == TOKEN_NUM_TYPE || t.type == TOKEN_STR_TYPE || t.type == TOKEN_ARR_TYPE) {
-        nextToken(parser); // Eat type
+        nextToken(parser);
         
         if (parser->currentToken.type != TOKEN_IDENTIFIER) {
             print_error("Expected variable name after type", parser->lexer->line);
@@ -101,12 +101,12 @@ ASTNode* parseStatement(Parser* parser) {
         
         ASTNode* node = createNode(AST_VARDECL);
         strcpy(node->name, parser->currentToken.value);
-        nextToken(parser); // Eat identifier
+        nextToken(parser);
         
         if (parser->currentToken.type != TOKEN_ASSIGN && parser->currentToken.type != TOKEN_VARDECL) {
             print_error("Expected '=' after variable name", parser->lexer->line);
         }
-        nextToken(parser); // Eat '='
+        nextToken(parser);
         
         node->right = parseExpression(parser);
         return node;
@@ -116,8 +116,8 @@ ASTNode* parseStatement(Parser* parser) {
     if (t.type == TOKEN_IDENTIFIER && peekNextToken(parser).type == TOKEN_VARDECL) {
         ASTNode* node = createNode(AST_VARDECL);
         strcpy(node->name, t.value);
-        nextToken(parser); // Eat identifier
-        nextToken(parser); // Eat :=
+        nextToken(parser);
+        nextToken(parser);
         node->right = parseExpression(parser);
         return node;
     }
@@ -126,18 +126,17 @@ ASTNode* parseStatement(Parser* parser) {
     if (t.type == TOKEN_IDENTIFIER && peekNextToken(parser).type == TOKEN_ASSIGN) {
         ASTNode* node = createNode(AST_ASSIGN);
         strcpy(node->name, t.value);
-        nextToken(parser); // Eat identifier
-        nextToken(parser); // Eat =
+        nextToken(parser);
+        nextToken(parser);
         node->right = parseExpression(parser);
         return node;
     }
     
-    // 4. Keywords
+    // 4 Keyword Statements: if, while, for, func, return, break, continue, use
     if (t.type == TOKEN_IF) {
         nextToken(parser); 
         ASTNode* node = createNode(AST_IF);
         
-        // FIX: Make parentheses optional
         int hasParens = 0;
         if (parser->currentToken.type == TOKEN_LPAREN) {
             hasParens = 1;
@@ -154,7 +153,12 @@ ASTNode* parseStatement(Parser* parser) {
         
         if (parser->currentToken.type == TOKEN_ELSE) {
             nextToken(parser);
-            node->body = parseBlock(parser); 
+            // Check for "else if"
+            if (parser->currentToken.type == TOKEN_IF) {
+                node->body = parseStatement(parser);
+            } else {
+                node->body = parseBlock(parser);
+            }
         }
         return node;
     }
@@ -234,6 +238,27 @@ ASTNode* parseStatement(Parser* parser) {
         return node;
     }
     
+    if (t.type == TOKEN_BREAK) {
+        nextToken(parser);
+        return createNode(AST_BREAK);
+    }
+    
+    if (t.type == TOKEN_CONTINUE) {
+        nextToken(parser);
+        return createNode(AST_CONTINUE);
+    }
+    
+    if (t.type == TOKEN_USE) {
+        nextToken(parser);
+        if (parser->currentToken.type != TOKEN_IDENTIFIER) {
+            print_error("Expected module name after 'use'", parser->lexer->line);
+        }
+        ASTNode* node = createNode(AST_USE);
+        strcpy(node->name, parser->currentToken.value);
+        nextToken(parser);
+        return node;
+    }
+    
     // 5. Expression Statement
     return parseExpression(parser);
 }
@@ -278,6 +303,24 @@ ASTNode* parseTerm(Parser* parser) {
 
 ASTNode* parseFactor(Parser* parser) {
     Token t = parser->currentToken;
+    
+    // Unary minus: -42 or -x
+    if (t.type == TOKEN_MINUS) {
+        nextToken(parser);
+        ASTNode* node = createNode(AST_UNARYOP);
+        strcpy(node->name, "-");
+        node->left = parseFactor(parser);
+        return node;
+    }
+    
+    // Unary not: !true
+    if (t.type == TOKEN_NOT) {
+        nextToken(parser);
+        ASTNode* node = createNode(AST_UNARYOP);
+        strcpy(node->name, "!");
+        node->left = parseFactor(parser);
+        return node;
+    }
     
     if (t.type == TOKEN_NUMBER) {
         ASTNode* node = createNode(AST_NUMBER);
@@ -341,8 +384,8 @@ ASTNode* parseFactor(Parser* parser) {
                  else if (t.type == TOKEN_NUM_TYPE) strcpy(node->name, "Num");
                  else strcpy(node->name, "Array");
                  
-                 nextToken(parser); // Eat keyword
-                 nextToken(parser); // Eat (
+                 nextToken(parser);
+                 nextToken(parser);
                  
                  if (parser->currentToken.type != TOKEN_RPAREN) {
                      node->left = parseExpression(parser);
@@ -384,11 +427,9 @@ ASTNode* parseFactor(Parser* parser) {
             
             if (parser->currentToken.type != TOKEN_RPAREN) {
                 node->left = parseExpression(parser);
-                // Handle multiple arguments
                 while (parser->currentToken.type == TOKEN_COMMA) {
-                    nextToken(parser); // Eat comma
+                    nextToken(parser); 
                     ASTNode* nextArg = parseExpression(parser);
-                    // Chain arguments via 'next' pointer
                     ASTNode* curr = node->left;
                     while(curr->next) curr = curr->next;
                     curr->next = nextArg;
@@ -397,14 +438,24 @@ ASTNode* parseFactor(Parser* parser) {
             expect(parser, TOKEN_RPAREN);
         }
         
+        // Array Indexing
+        while (parser->currentToken.type == TOKEN_LBRACKET) {
+            ASTNode* indexNode = createNode(AST_INDEX);
+            indexNode->left = node;
+            nextToken(parser);
+            indexNode->right = parseExpression(parser);
+            expect(parser, TOKEN_RBRACKET);
+            node = indexNode;
+        }
+        
         return node;
     }
     
-    // If we got here, nothing matched
+    // Error
     char errBuf[100];
     sprintf(errBuf, "Unexpected token '%s'", t.value);
     print_error(errBuf, parser->lexer->line);
-    return NULL; // Unreachable, but keeps compiler happy
+    return NULL;
 }
 
 ASTNode* parseBlock(Parser* parser) {

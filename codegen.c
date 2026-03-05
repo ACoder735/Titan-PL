@@ -36,6 +36,26 @@ int hasSymbol(const char* name) {
     return 0;
 }
 
+// --- Module Copy Helper ---
+void copyModuleHeader(const char* moduleName, const char* destPath) {
+    char srcPath[512];
+    char destFile[512];
+    
+    sprintf(srcPath, "Library\\titan_%s.h", moduleName);
+    sprintf(destFile, "%s\\titan_%s.h", destPath, moduleName);
+    
+    FILE* src = fopen(srcPath, "r");
+    FILE* dest = fopen(destFile, "w");
+    if (src && dest) {
+        char buf[1024];
+        while (fgets(buf, sizeof(buf), src)) {
+            fputs(buf, dest);
+        }
+    }
+    if (src) fclose(src);
+    if (dest) fclose(dest);
+}
+
 // --- Code Generation ---
 void generateNode(ASTNode* node, FILE* out);
 void generateBlock(ASTNode* block, FILE* out);
@@ -62,7 +82,16 @@ void generateNode(ASTNode* node, FILE* out) {
             fprintf(out, "_t; })");
             break;
         }
-
+        
+        case AST_INDEX: {
+            fprintf(out, "titan_arr_get(");
+            generateNode(node->left, out);
+            fprintf(out, ", (int)(");
+            generateNode(node->right, out);
+            fprintf(out, ").num)");
+            break;
+        } 
+        
         case AST_VARDECL: {
             if (hasSymbol(node->name)) {
                 fprintf(out, "%s = ", node->name);
@@ -81,7 +110,7 @@ void generateNode(ASTNode* node, FILE* out) {
             if (!hasSymbol(node->name)) {
                 char buf[150];
                 sprintf(buf, "Variable '%s' not declared. Use := to create it.", node->name);
-                print_error(buf, 0); // This uses the compiler's utils
+                print_error(buf, 0);
             }
             fprintf(out, "%s = ", node->name);
             generateNode(node->right, out);
@@ -110,65 +139,134 @@ void generateNode(ASTNode* node, FILE* out) {
             else if (strcmp(node->name, "-") == 0) { fprintf(out, "titan_neg("); generateNode(node->left, out); fprintf(out, ")"); }
             break;
         
-        case AST_CALL: {
-            if (strcmp(node->name, "Str") == 0) { fprintf(out, "titan_tostring("); generateNode(node->left, out); fprintf(out, ")"); }
-            else if (strcmp(node->name, "Num") == 0) { fprintf(out, "titan_tonum("); generateNode(node->left, out); fprintf(out, ")"); }
-            else if (strcmp(node->name, "len") == 0) { fprintf(out, "titan_len("); generateNode(node->left, out); fprintf(out, ")"); }
-            else if (strcmp(node->name, "Array") == 0) { fprintf(out, "titan_new_array()"); }
+                case AST_CALL: {
+            char* name = node->name;
             
-            else if (strcmp(node->name, "console.typeln") == 0) { fprintf(out, "titan_println("); generateNode(node->left, out); fprintf(out, ")"); }
-            else if (strcmp(node->name, "console.type") == 0) { fprintf(out, "titan_print("); generateNode(node->left, out); fprintf(out, ")"); }
-            else if (strcmp(node->name, "console.askuser") == 0) { fprintf(out, "titan_input("); generateNode(node->left, out); fprintf(out, ")"); }
-            else if (strcmp(node->name, "console.clear") == 0) {fprintf(out, "titan_clear()");}
-            else if (strcmp(node->name, "console.setTitle") == 0) {fprintf(out, "titan_settitle(");generateNode(node->left, out);fprintf(out, ")");}
-            else if (strcmp(node->name, "console.color") == 0) {fprintf(out, "titan_color(");generateNode(node->left, out);fprintf(out, ")");}
-            
-            else if (strchr(node->name, '.') != NULL) {
-                char objName[100]; 
-                char methodName[100];
-                strcpy(objName, node->name);
-                char* dot = strchr(objName, '.');
-                *dot = '\0'; 
-                strcpy(methodName, dot + 1);
-
-                if (strcmp(methodName, "push") == 0) {
-                    fprintf(out, "titan_arr_push(%s, ", objName); 
-                    generateNode(node->left, out); 
-                    fprintf(out, ")");
-                }
-                else if (strcmp(methodName, "get") == 0) {
-                    fprintf(out, "titan_arr_get(%s, (int)(", objName);
-                    generateNode(node->left, out);
-                    fprintf(out, ").num)");
-                }
-                else if (strcmp(methodName, "remove") == 0) {
-                    fprintf(out, "titan_arr_remove(%s, (int)(", objName);
-                    generateNode(node->left, out);
-                    fprintf(out, ").num)");
-                }
-                else if (strcmp(methodName, "insert") == 0) {
-                    ASTNode* idxArg = node->left;
-                    ASTNode* valArg = idxArg ? idxArg->next : NULL;
-                    fprintf(out, "titan_arr_insert(%s, (int)(", objName);
-                    if(idxArg) generateNode(idxArg, out);
-                    fprintf(out, ").num, ");
-                    if(valArg) generateNode(valArg, out);
-                    fprintf(out, ")");
-                }
-                else if (strcmp(methodName, "replace") == 0) {
-                    ASTNode* idxArg = node->left;
-                    ASTNode* valArg = idxArg ? idxArg->next : NULL;
-                    fprintf(out, "titan_arr_replace(%s, (int)(", objName);
-                    if(idxArg) generateNode(idxArg, out);
-                    fprintf(out, ").num, ");
-                    if(valArg) generateNode(valArg, out);
-                    fprintf(out, ")");
-                }
+            // ===== BUILT-IN TYPE CONVERSIONS =====
+            if (strcmp(name, "Str") == 0) { 
+                fprintf(out, "titan_tostring("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
             }
-            else {
-                fprintf(out, "f_%s(", node->name);
+            else if (strcmp(name, "Num") == 0) { 
+                fprintf(out, "titan_tonum("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            else if (strcmp(name, "len") == 0) { 
+                fprintf(out, "titan_len("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            else if (strcmp(name, "Array") == 0) { 
+                fprintf(out, "titan_new_array()"); 
+            }
+            
+            // ===== CONSOLE FUNCTIONS =====
+            else if (strcmp(name, "console.typeln") == 0) { 
+                fprintf(out, "titan_println("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            else if (strcmp(name, "console.type") == 0) { 
+                fprintf(out, "titan_print("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            else if (strcmp(name, "console.askuser") == 0) { 
+                fprintf(out, "titan_input("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            else if (strcmp(name, "console.clear") == 0) { 
+                fprintf(out, "titan_clear()"); 
+            }
+            else if (strcmp(name, "console.setTitle") == 0) { 
+                fprintf(out, "titan_settitle("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            else if (strcmp(name, "console.color") == 0) { 
+                fprintf(out, "titan_color("); 
+                generateNode(node->left, out); 
+                fprintf(out, ")"); 
+            }
+            
+            // ===== MODULE FUNCTIONS =====
+            else if (strncmp(name, "math.", 5) == 0 ||
+                     strncmp(name, "file.", 5) == 0 ||
+                     strncmp(name, "time.", 5) == 0 ||
+                     strncmp(name, "sys.", 4) == 0) {
+                char funcName[100];
+                strcpy(funcName, name);
+                for (int i = 0; funcName[i] != '\0'; i++) {
+                    if (funcName[i] == '.') funcName[i] = '_';
+                }
+                fprintf(out, "f_%s(", funcName);
                 ASTNode* arg = node->left;
-                while(arg) { generateNode(arg, out); arg = arg->next; if (arg) fprintf(out, ", "); }
+                while(arg) { 
+                    generateNode(arg, out); 
+                    arg = arg->next; 
+                    if (arg) fprintf(out, ", "); 
+                }
+                fprintf(out, ")");
+            }
+            
+            // ===== ARRAY METHODS =====
+            else if (strstr(name, ".push") != NULL) {
+                char objName[100];
+                strcpy(objName, name);
+                char* dot = strchr(objName, '.');
+                *dot = '\0';
+                fprintf(out, "titan_arr_push(%s, ", objName); 
+                generateNode(node->left, out); 
+                fprintf(out, ")");
+            }
+            else if (strstr(name, ".remove") != NULL) {
+                char objName[100];
+                strcpy(objName, name);
+                char* dot = strchr(objName, '.');
+                *dot = '\0';
+                fprintf(out, "titan_arr_remove(%s, (int)(", objName);
+                generateNode(node->left, out);
+                fprintf(out, ").num)");
+            }
+            else if (strstr(name, ".insert") != NULL) {
+                char objName[100];
+                strcpy(objName, name);
+                char* dot = strchr(objName, '.');
+                *dot = '\0';
+                ASTNode* idxArg = node->left;
+                ASTNode* valArg = idxArg ? idxArg->next : NULL;
+                fprintf(out, "titan_arr_insert(%s, (int)(", objName);
+                if(idxArg) generateNode(idxArg, out);
+                fprintf(out, ").num, ");
+                if(valArg) generateNode(valArg, out);
+                fprintf(out, ")");
+            }
+            else if (strstr(name, ".replace") != NULL) {
+                char objName[100];
+                strcpy(objName, name);
+                char* dot = strchr(objName, '.');
+                *dot = '\0';
+                ASTNode* idxArg = node->left;
+                ASTNode* valArg = idxArg ? idxArg->next : NULL;
+                fprintf(out, "titan_arr_replace(%s, (int)(", objName);
+                if(idxArg) generateNode(idxArg, out);
+                fprintf(out, ").num, ");
+                if(valArg) generateNode(valArg, out);
+                fprintf(out, ")");
+            }
+            
+            // ===== USER-DEFINED FUNCTIONS =====
+            else {
+                fprintf(out, "f_%s(", name);
+                ASTNode* arg = node->left;
+                while(arg) { 
+                    generateNode(arg, out); 
+                    arg = arg->next; 
+                    if (arg) fprintf(out, ", "); 
+                }
                 fprintf(out, ")");
             }
             break;
@@ -227,6 +325,17 @@ void generateNode(ASTNode* node, FILE* out) {
             fprintf(out, ";\n");
             break;
 
+        case AST_BREAK:
+            fprintf(out, "break;\n");
+            break;
+        
+        case AST_CONTINUE:
+            fprintf(out, "continue;\n");
+            break;
+        
+        case AST_USE:
+            break;
+
         default: break;
     }
 }
@@ -250,19 +359,16 @@ void writeRuntimeHeader(const char* filename) {
     FILE* out = fopen(filename, "w"); if(!out) return;
     fprintf(out, "#ifndef TITAN_RUNTIME_H\n#define TITAN_RUNTIME_H\n\n");
     fprintf(out, "#include <windows.h>\n\n");
-    fprintf(out, "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n\n");
+    fprintf(out, "#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n#include <time.h>\n\n");
 
-    // Forward Declaration
     fprintf(out, "typedef struct TitanVar TitanVar;\n\n");
 
-    // Array Struct
     fprintf(out, "typedef struct {\n");
     fprintf(out, "    TitanVar* data;\n");
     fprintf(out, "    int count;\n");
     fprintf(out, "    int capacity;\n");
     fprintf(out, "} TitanArray;\n\n");
 
-    // TitanVar Struct
     fprintf(out, "struct TitanVar {\n");
     fprintf(out, "    int type; double num; char* str; TitanArray* arr;\n");
     fprintf(out, "};\n\n");
@@ -271,10 +377,8 @@ void writeRuntimeHeader(const char* filename) {
     fprintf(out, "#define titan_num(n) ((TitanVar){1, n, 0, 0})\n");
     fprintf(out, "#define titan_str(s) ((TitanVar){2, 0, s, 0})\n\n");
     
-    // Boolean
     fprintf(out, "int titan_bool(TitanVar v) { if (v.type == 0) return 0; if (v.type == 1) return v.num != 0; if (v.type == 2) return v.str != NULL && strlen(v.str) > 0; return 0; }\n\n");
     
-    // --- ERROR HELPER (Injected into runtime) ---
     fprintf(out, "void _titan_runtime_error(const char* msg) {\n");
     fprintf(out, "    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);\n");
     fprintf(out, "    CONSOLE_SCREEN_BUFFER_INFO info;\n");
@@ -286,7 +390,6 @@ void writeRuntimeHeader(const char* filename) {
     fprintf(out, "    exit(1);\n");
     fprintf(out, "}\n\n");
 
-    // Array Functions
     fprintf(out, "TitanVar titan_new_array() {\n");
     fprintf(out, "    TitanArray* a = malloc(sizeof(TitanArray));\n");
     fprintf(out, "    a->data = malloc(sizeof(TitanVar) * 4);\n");
@@ -346,7 +449,6 @@ void writeRuntimeHeader(const char* filename) {
     fprintf(out, "    return titan_num(0);\n");
     fprintf(out, "}\n\n");
 
-    // Conversion
     fprintf(out, "char* _titan_val_to_str(TitanVar v) {\n");
     fprintf(out, "    char* buf = malloc(256); buf[0] = 0;\n");
     fprintf(out, "    if (v.type == 1) { sprintf(buf, \"%%g\", v.num); }\n");
@@ -371,22 +473,20 @@ void writeRuntimeHeader(const char* filename) {
 
     fprintf(out, "TitanVar titan_tonum(TitanVar v) { if (v.type == 1) return v; if (v.type == 2) return titan_num(atof(v.str)); return titan_num(0); }\n\n");
     
-    // Print - UPDATED to use runtime error
     fprintf(out, "void titan_print(TitanVar v) {\n");
     fprintf(out, "    if (v.type == 2) printf(\"%%s\", v.str);\n"); 
     fprintf(out, "    else _titan_runtime_error(\"Cannot print non-String types. Use Str(val).\");\n");
     fprintf(out, "}\n");
     fprintf(out, "void titan_println(TitanVar v) { titan_print(v); printf(\"\\n\"); }\n\n");
     
-    // Input
     fprintf(out, "TitanVar titan_input(TitanVar prompt) { titan_print(prompt); fflush(stdout); char* buffer = malloc(256); if (fgets(buffer, 256, stdin) != NULL) { buffer[strcspn(buffer, \"\\n\")] = 0; buffer[strcspn(buffer, \"\\r\")] = 0; return titan_str(buffer); } return TITAN_NULL; }\n\n");
     
-    // Math - UPDATED to use runtime error
     fprintf(out, "TitanVar titan_add(TitanVar a, TitanVar b) {\n");
     fprintf(out, "    if (a.type == 1 && b.type == 1) return titan_num(a.num + b.num);\n"); 
     fprintf(out, "    if (a.type == 2 && b.type == 2) { int len = strlen(a.str) + strlen(b.str) + 1; char* res = malloc(len); strcpy(res, a.str); strcat(res, b.str); return titan_str(res); }\n"); 
     fprintf(out, "    if (a.type == 3 && b.type == 3) return titan_arr_concat(a, b);\n");
-    fprintf(out, "    _titan_runtime_error(\"Cannot add mismatched types.\");\n"); 
+    fprintf(out, "    _titan_runtime_error(\"Cannot add mismatched types.\");\n");
+    fprintf(out, "    return TITAN_NULL;\n"); 
     fprintf(out, "}\n\n");
     
     fprintf(out, "TitanVar titan_sub(TitanVar a, TitanVar b) { if (a.type != 1 || b.type != 1) _titan_runtime_error(\"'-' requires Numbers.\"); return titan_num(a.num - b.num); }\n");
@@ -399,7 +499,6 @@ void writeRuntimeHeader(const char* filename) {
     fprintf(out, "TitanVar titan_and(TitanVar a, TitanVar b) { return titan_num(titan_bool(a) && titan_bool(b)); }\n");
     fprintf(out, "TitanVar titan_or(TitanVar a, TitanVar b) { return titan_num(titan_bool(a) || titan_bool(b)); }\n\n");
 
-    // Comparisons
     fprintf(out, "TitanVar titan_eq(TitanVar a, TitanVar b) { if (a.type != b.type) return titan_num(0); if (a.type == 0) return titan_num(1); if (a.type == 2) return titan_num(strcmp(a.str, b.str) == 0); return titan_num(a.num == b.num); }\n");
     fprintf(out, "TitanVar titan_neq(TitanVar a, TitanVar b) { return titan_num(!titan_bool(titan_eq(a, b))); }\n");
     fprintf(out, "TitanVar titan_lt(TitanVar a, TitanVar b) { return titan_num(a.num < b.num); }\n");
@@ -407,12 +506,14 @@ void writeRuntimeHeader(const char* filename) {
     fprintf(out, "TitanVar titan_lte(TitanVar a, TitanVar b) { return titan_num(a.num <= b.num); }\n");
     fprintf(out, "TitanVar titan_gte(TitanVar a, TitanVar b) { return titan_num(a.num >= b.num); }\n\n");
 
-    // Console Helpers
     fprintf(out, "void titan_clear() { system(\"cls\"); }\n"); 
     fprintf(out, "void titan_settitle(TitanVar t) { if(t.type != 2) return; char cmd[256]; sprintf(cmd, \"title %%s\", t.str); system(cmd); }\n\n");
     fprintf(out, "void titan_color(TitanVar c) {\n");
     fprintf(out, "    if (c.type == 1) SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (int)c.num);\n");
     fprintf(out, "}\n\n");
+
+    fprintf(out, "int _titan_argc = 0;\n");
+    fprintf(out, "char** _titan_argv = NULL;\n");
     
     fprintf(out, "#endif\n");
     fclose(out);
@@ -421,21 +522,56 @@ void writeRuntimeHeader(const char* filename) {
 void generateCode(ASTNode* root, const char* filename) {
     char headerPath[256]; strcpy(headerPath, filename);
     char* lastSlash = strrchr(headerPath, '\\');
-    if (lastSlash) { *(lastSlash + 1) = 0; strcat(headerPath, "titan_runtime.h"); }
-    else strcpy(headerPath, "titan_runtime.h");
+    if (lastSlash) { 
+        *(lastSlash + 1) = 0; 
+        strcat(headerPath, "titan_runtime.h"); 
+    } else {
+        strcpy(headerPath, "titan_runtime.h");
+    }
     writeRuntimeHeader(headerPath);
+    
+    char projectPath[256];
+    strcpy(projectPath, filename);
+    lastSlash = strrchr(projectPath, '\\');
+    if (lastSlash) *(lastSlash + 1) = 0;
+    else strcpy(projectPath, ".");
 
     FILE* out = fopen(filename, "w");
-    fprintf(out, "// Generated by Titan Compiler v0.9.0 .\n");
-    fprintf(out, "#include \"titan_runtime.h\"\n\n");
-
+    fprintf(out, "// Generated by Titan Compiler v0.9.0\n");
+    fprintf(out, "#include \"titan_runtime.h\"\n");
+    
     ASTNode* current = root->left;
-    while(current) { if (current->type == AST_FUNCDECL) { resetSymbols(); generateNode(current, out); } current = current->next; }
-
-    fprintf(out, "// MAIN\nint main() {\n");
-    resetSymbols(); enterScope();
+    while(current) {
+        if (current->type == AST_USE) {
+            copyModuleHeader(current->name, projectPath);
+            fprintf(out, "#include \"titan_%s.h\"\n", current->name);
+        }
+        current = current->next;
+    }
+    fprintf(out, "\n");
+    
     current = root->left;
-    while(current) { if (current->type != AST_FUNCDECL) { generateNode(current, out); if (current->type == AST_CALL) fprintf(out, ";\n"); } current = current->next; }
+    while(current) { 
+        if (current->type == AST_FUNCDECL) { 
+            resetSymbols(); 
+            generateNode(current, out); 
+        } 
+        current = current->next; 
+    }
+
+    fprintf(out, "int main(int argc, char** argv) {\n");
+    fprintf(out, "    _titan_argc = argc;\n");
+    fprintf(out, "    _titan_argv = argv;\n");
+    resetSymbols(); 
+    enterScope();
+    current = root->left;
+    while(current) { 
+        if (current->type != AST_FUNCDECL && current->type != AST_USE) { 
+            generateNode(current, out); 
+            if (current->type == AST_CALL) fprintf(out, ";\n"); 
+        } 
+        current = current->next; 
+    }
     fprintf(out, "    system(\"pause\");\n    return 0;\n}\n");
     fclose(out);
 }
