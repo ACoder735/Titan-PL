@@ -25,11 +25,9 @@ for x:=0 to 10{ // For loop
 }
 ```
 
-**⚠ Important Note: Titan v0.9.0 will be released and ready for use in the 10th of March, 2026.**
+**⚠ Important Note: Titan v0.9.0 will be released and ready for use in the 15th of March, 2026.**
 
-**⚠ Important Note: This will probably only work on `Windows` computers, not `MacOS`, `Linux` or any other OS.**
-
-**⚠ Important Note: To run Titan, please install GCC:**
+**⚠ Important Note: To run Titan, please install GCC (Windows):**
 > To compile and run Titan code, you need GCC installed via MSYS2.
 > ## Step 1: Install MSYS2
 > 
