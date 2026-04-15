@@ -6,24 +6,26 @@ import (
 )
 
 func main() {
-    // 1. Handle Arguments
     args := os.Args
     if len(args) > 1 && args[1] == "version" {
         fmt.Println("Titan Programming Language v1.0.0")
         return
     }
 
-    // 2. The Code to Test (Later we will read from a file)
     code := `typeln("Hello Titan!")`
 
-    // 3. Initialize Lexer
+    // 1. Lexing
     lexer := NewLexer(code)
 
-    // 4. Print Tokens (Temporary test)
-    fmt.Println("--- TITAN LEXER OUTPUT ---")
-    for {
-        tok := lexer.NextToken()
-        fmt.Printf("Type: %s, Value: %q\n", tok.Type, tok.Value)
-        if tok.Type == TOKEN_EOF { break }
+    // 2. Parsing
+    parser := NewParser(lexer)
+    ast := parser.Parse()
+
+    // 3. Print the Result
+    if ast != nil {
+        fmt.Printf("Found Call: %s\n", ast.CallName)
+        fmt.Printf("Argument: %s\n", ast.Args[0].Value)
+    } else {
+        fmt.Println("Parsing Error!")
     }
 }
