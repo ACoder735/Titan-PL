@@ -20,9 +20,13 @@ for i:=1 to 10{
 ```
 ## Why Titan?
 Titan is designed to be the **PERFECT** proggramming language, choosing to be:
+
 **Simple**
+
 **Safe**
+
 **Fast**
+
 **Boilerplate-free**
 
 It is also designed to be a great language for both beginners and experienced programmers, with a simple syntax and powerful features.
