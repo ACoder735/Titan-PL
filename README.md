@@ -36,7 +36,7 @@ It is also designed to be a great language for both beginners and experienced pr
 ## More:
 - [Bug reporting](https://github.com/ACoder735/Titan-PL/discussions)
 - [Documentation](https://github.com/ACoder735/Titan-PL/wiki)
-- [License](https://github.com/ACoder735/Titan-PL/blob/main/LICENSE)
+- [License](https://github.com/ACoder735/Titan-PL?tab=MIT-1-ov-file)
 
 **ℹ Note: Titan is still in early development, so there may not be many feutres or libraies yet, but I am working on it!**
 
